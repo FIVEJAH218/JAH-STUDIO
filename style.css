@@ -40,3 +40,5 @@ dialog::backdrop{background:rgba(0,0,0,.55)}
   .canvas-card{grid-column:2;grid-row:1 / span 4;position:sticky;top:74px}
   #stageShell{min-height:650px}
 }
+
+.tools.two-buttons{grid-template-columns:1fr 1fr;margin-top:8px}

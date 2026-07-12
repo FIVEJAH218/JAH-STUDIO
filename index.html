@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#111111">
-  <title>JAH STUDIO v1.1</title>
+  <title>JAH STUDIO v1.3</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -14,7 +14,7 @@
     <h1>JAH STUDIO</h1>
     <small>PRINT DESIGN STUDIO</small>
   </div>
-  <span>v1.1</span>
+  <span>v1.3</span>
 </header>
 
 <main>
@@ -53,14 +53,18 @@
 
   <section class="card">
     <h2>2. 素材</h2>
-    <input id="imageInput" type="file" accept="image/*" multiple hidden>
+    <input id="imageInput" type="file" accept="image/*,.svg" multiple hidden>
     <div class="tools">
-      <button id="addImage">＋画像</button>
+      <button id="addImage">＋画像/SVG</button>
       <button id="addText">＋文字</button>
       <button id="duplicate" class="secondary">複製</button>
       <button id="remove" class="danger">削除</button>
     </div>
-    <p class="hint">画像は何枚でも追加可能。移動・拡大縮小・回転ができます。</p>
+    <div class="tools two-buttons">
+      <button id="undo" class="secondary">↶ 戻す</button>
+      <button id="redo" class="secondary">↷ やり直し</button>
+    </div>
+    <p class="hint">画像・SVGは何枚でも追加可能。移動・拡大縮小・回転ができます。</p>
   </section>
 
   <section class="card canvas-card">
@@ -77,19 +81,29 @@
     <h2>4. 選択中の素材</h2>
     <div id="selectionInfo" class="info">素材を選択してください</div>
 
+    <div class="two">
+      <div><label>横幅 mm</label><input id="objW" type="number" step="0.1"></div>
+      <div><label>高さ mm</label><input id="objH" type="number" step="0.1"></div>
+    </div>
+    <div class="two">
+      <div><label>X座標 mm</label><input id="objX" type="number" step="0.1"></div>
+      <div><label>Y座標 mm</label><input id="objY" type="number" step="0.1"></div>
+    </div>
+    <div class="two">
+      <div><label>回転 °</label><input id="objAngle" type="number" step="1"></div>
+      <div><label>縦横比</label><select id="lockRatio"><option value="on">固定する</option><option value="off">固定しない</option></select></div>
+    </div>
     <label>不透明度 <span id="opacityValue">100%</span></label>
     <input id="opacity" type="range" min="0" max="100" value="100">
-
     <div class="tools three">
+      <button id="applyObject" class="secondary">数値を反映</button>
       <button id="centerX" class="secondary">左右中央</button>
       <button id="centerY" class="secondary">上下中央</button>
-      <button id="fit" class="secondary">枠に収める</button>
     </div>
-
     <div class="tools three">
+      <button id="fit" class="secondary">枠に収める</button>
       <button id="front" class="secondary">最前面</button>
-      <button id="forward" class="secondary">一つ前</button>
-      <button id="backward" class="secondary">一つ後</button>
+      <button id="back" class="secondary">最背面</button>
     </div>
   </section>
 
@@ -103,9 +117,13 @@
     <div class="tools three">
       <button id="exportPng">PNG</button>
       <button id="exportSvg">SVG</button>
-      <button id="saveProject" class="secondary">端末保存</button>
+      <button id="exportPdf">PDF</button>
     </div>
-    <div id="status" class="info">テンプレートを選び、画像を追加してください。</div>
+    <div class="tools two-buttons">
+      <button id="saveProject" class="secondary">今すぐ保存</button>
+      <button id="clearProject" class="danger">保存を消去</button>
+    </div>
+    <div id="status" class="info">自動保存はONです。</div>
   </section>
 </main>
 
@@ -129,6 +147,7 @@
 </dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="script.js"></script>
 </body>
 </html>
