@@ -1,7 +1,7 @@
 (() => {
   const $ = id => document.getElementById(id);
   const { jsPDF } = window.jspdf;
-  const KEY = 'jahStudioProjectV14';
+  const KEY = 'jahStudioProjectV16';
   const templates = {a3p:[297,420],a3l:[420,297],a4p:[210,297],b4p:[257,364],b5p:[182,257],leftchest:[100,100],sleeve:[90,300],senjafuda:[45,135]};
   let pageW=297,pageH=420,seq=1,guideObjs=[],saveTimer=null;
   let history=[],historyIndex=-1,historyBusy=false;
@@ -223,7 +223,7 @@
   function refreshLayers(){const host=$('layers');host.innerHTML='';userObjects().slice().reverse().forEach(o=>{const row=document.createElement('div');row.className='layer'+(active()===o?' active':'');const name=document.createElement('button');name.className='name secondary';name.textContent=o._jahName||o.type;name.onclick=()=>{canvas.setActiveObject(o);canvas.requestRenderAll();refreshLayers();updateInfo();};const up=document.createElement('button');up.className='secondary';up.textContent='↑';up.onclick=()=>{canvas.bringForward(o);guideObjs.forEach(g=>canvas.bringToFront(g));afterChange();};const down=document.createElement('button');down.className='secondary';down.textContent='↓';down.onclick=()=>{canvas.sendBackwards(o);guideObjs.forEach(g=>canvas.bringToFront(g));afterChange();};const lock=document.createElement('button');lock.className='secondary';lock.textContent=o.selectable?'🔓':'🔒';lock.onclick=()=>{const v=o.selectable;o.set({selectable:!v,evented:!v});canvas.discardActiveObject();canvas.requestRenderAll();afterChange();};const del=document.createElement('button');del.className='danger';del.textContent='×';del.onclick=()=>{canvas.remove(o);afterChange();};row.append(name,up,down,lock,del);host.appendChild(row);});}
   function snapObject(o){if(!$('snap').checked)return;if(Math.abs(o.getCenterPoint().x-pageW/2)<4)o.set({left:pageW/2,originX:'center'});if(Math.abs(o.getCenterPoint().y-pageH/2)<4)o.set({top:pageH/2,originY:'center'});}
 
-  function snapshot(){return JSON.stringify({version:'1.5β',pageW,pageH,template:$('template').value,guides:$('guides').checked,grid:$('grid').checked,snap:$('snap').checked,json:canvas.toJSON(['_jahId','_jahName','excludeFromExport'])});}
+  function snapshot(){return JSON.stringify({version:'1.6',pageW,pageH,template:$('template').value,guides:$('guides').checked,grid:$('grid').checked,snap:$('snap').checked,json:canvas.toJSON(['_jahId','_jahName','excludeFromExport'])});}
   function recordHistory(){if(historyBusy)return;const s=snapshot();if(history[historyIndex]===s)return;history=history.slice(0,historyIndex+1);history.push(s);if(history.length>30)history.shift();historyIndex=history.length-1;updateHistoryButtons();}
   function updateHistoryButtons(){$('undo').disabled=historyIndex<=0;$('redo').disabled=historyIndex>=history.length-1;}
   function loadState(state){historyBusy=true;const d=JSON.parse(state);pageW=d.pageW;pageH=d.pageH;$('template').value=d.template||'custom';$('docW').value=pageW;$('docH').value=pageH;$('guides').checked=d.guides!==false;$('grid').checked=!!d.grid;$('snap').checked=d.snap!==false;canvas.loadFromJSON(d.json,()=>{resizeCanvas();refreshLayers();updateInfo();historyBusy=false;scheduleSave();updateHistoryButtons();});}
@@ -243,7 +243,68 @@
   function download(url,name){const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();}
   $('exportPng').onclick=()=>{download(withoutGuides(()=>canvas.toDataURL({format:'png',multiplier:4,enableRetinaScaling:true})),'JAH_STUDIO_design.png');status('PNGを書き出しました。');};
   $('exportSvg').onclick=()=>{const svg=withoutGuides(()=>canvas.toSVG({width:pageW+'mm',height:pageH+'mm',viewBox:{x:0,y:0,width:pageW,height:pageH}})),b=new Blob([svg],{type:'image/svg+xml'}),u=URL.createObjectURL(b);download(u,'JAH_STUDIO_design.svg');setTimeout(()=>URL.revokeObjectURL(u),1000);status('SVGを書き出しました。');};
-  $('exportPdf').onclick=()=>{const img=withoutGuides(()=>canvas.toDataURL({format:'png',multiplier:4,enableRetinaScaling:true})),pdf=new jsPDF({orientation:pageW>pageH?'landscape':'portrait',unit:'mm',format:[pageW,pageH]});pdf.addImage(img,'PNG',0,0,pageW,pageH,undefined,'FAST');pdf.save('JAH_STUDIO_print.pdf');status('PDFを書き出しました。');};
+  function objectOutsidePage(o){
+    const b=o.getBoundingRect(true,true);
+    return b.left<0||b.top<0||b.left+b.width>pageW||b.top+b.height>pageH;
+  }
+  function countSvgPaths(o){
+    let n=0;
+    const walk=x=>{if(!x)return;if(x.type==='path')n++;if(x.getObjects)x.getObjects().forEach(walk);};
+    walk(o);return n;
+  }
+  function printDiagnostics(){
+    const objs=userObjects(),rasters=objs.filter(isRasterImage),texts=objs.filter(o=>o.type==='text'||o.type==='textbox'||o.type==='i-text'),outside=objs.filter(objectOutsidePage),paths=objs.reduce((a,o)=>a+countSvgPaths(o),0);
+    const lines=[];
+    lines.push(`用紙：${pageW} × ${pageH} mm`);
+    lines.push(`素材：${objs.length}個／ベクターパス：約${paths}個`);
+    if(rasters.length)lines.push(`⚠ 画像素材 ${rasters.length}個：完全ベクターPDFにするには先にベクター化してください。`);else lines.push('✓ 画像素材なし：ベクターPDFに適した状態です。');
+    if(texts.length)lines.push(`⚠ 文字 ${texts.length}個：PDFでは文字として保持されます。印刷店によってはアウトライン化を求められます。`);
+    if(outside.length)lines.push(`⚠ 用紙外にはみ出す素材 ${outside.length}個があります。`);else lines.push('✓ 全素材が用紙内に収まっています。');
+    if(paths>12000)lines.push('⚠ パス数が多いため、印刷ソフトで重くなる可能性があります。');
+    const box=$('printCheck');box.textContent=lines.join('\n');box.className='print-check info '+(rasters.length||outside.length?'warn':'ok');
+    return {rasters,texts,outside,paths};
+  }
+  $('exportPdf').onclick=()=>{$('pdfDialog').showModal();printDiagnostics();};
+  $('cancelPdf').onclick=()=>$('pdfDialog').close();
+
+  function cloneCanvasSvg(blackOnly=false){
+    return withoutGuides(()=>{
+      const prior=[];
+      if(blackOnly){userObjects().forEach(o=>{prior.push([o,o.fill,o.stroke]);paintBlack(o);});canvas.requestRenderAll();}
+      const svg=canvas.toSVG({width:pageW+'mm',height:pageH+'mm',viewBox:{x:0,y:0,width:pageW,height:pageH}});
+      if(blackOnly){prior.forEach(([o,f,st])=>o.set({fill:f,stroke:st}));canvas.requestRenderAll();}
+      return svg;
+    });
+  }
+
+  async function exportVectorPdf(blackOnly=false){
+    const diag=printDiagnostics();
+    if(diag.rasters.length){
+      const ok=confirm(`画像素材が${diag.rasters.length}個残っています。\nこの部分はPDF内で画像のままになります。\n続けますか？`);
+      if(!ok)return;
+    }
+    status('ベクターPDFを作成中です…');
+    const svgText=cloneCanvasSvg(blackOnly);
+    const doc=new DOMParser().parseFromString(svgText,'image/svg+xml');
+    const svgEl=doc.documentElement;
+    const pdf=new jsPDF({orientation:pageW>pageH?'landscape':'portrait',unit:'mm',format:[pageW,pageH],compress:true,putOnlyUsedFonts:true});
+    if(typeof pdf.svg!=='function')throw new Error('ベクターPDF機能を読み込めません。通信環境を確認してください。');
+    await pdf.svg(svgEl,{x:0,y:0,width:pageW,height:pageH});
+    pdf.save(blackOnly?'JAH_STUDIO_silk_vector.pdf':'JAH_STUDIO_vector_print.pdf');
+    status(blackOnly?'黒1色ベクターPDFを書き出しました。':'ベクターPDFを書き出しました。');
+  }
+  function exportRasterPdf(){
+    const img=withoutGuides(()=>canvas.toDataURL({format:'png',multiplier:4,enableRetinaScaling:true}));
+    const pdf=new jsPDF({orientation:pageW>pageH?'landscape':'portrait',unit:'mm',format:[pageW,pageH],compress:true});
+    pdf.addImage(img,'PNG',0,0,pageW,pageH,undefined,'FAST');pdf.save('JAH_STUDIO_raster_print.pdf');status('画像PDFを書き出しました。');
+  }
+  $('confirmPdf').onclick=async()=>{
+    const mode=document.querySelector('input[name="pdfMode"]:checked')?.value||'vector';
+    $('confirmPdf').disabled=true;
+    try{if(mode==='raster')exportRasterPdf();else await exportVectorPdf(mode==='silk');$('pdfDialog').close();}
+    catch(e){status(e.message||'PDF作成に失敗しました。');$('printCheck').textContent='エラー：'+(e.message||'PDF作成に失敗しました。');$('printCheck').className='print-check info bad';}
+    finally{$('confirmPdf').disabled=false;}
+  };
 
   addEventListener('resize',resizeCanvas);restore();
 })();

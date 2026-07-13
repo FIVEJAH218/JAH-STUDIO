@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#111111">
-  <title>JAH STUDIO v1.5β</title>
+  <title>JAH STUDIO v1.6</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -14,7 +14,7 @@
     <h1>JAH STUDIO</h1>
     <small>PRINT DESIGN STUDIO</small>
   </div>
-  <span>v1.5β</span>
+  <span>v1.6</span>
 </header>
 
 <main>
@@ -209,8 +209,27 @@
   </div>
 </dialog>
 
+
+<dialog id="pdfDialog">
+  <div class="dialog-body pdf-dialog-body">
+    <h3>PDF書き出し</h3>
+    <p class="hint">レイアウトしたサイズ・位置・回転をそのまま出力します。</p>
+    <div class="pdf-modes">
+      <label class="mode-card"><input type="radio" name="pdfMode" value="vector" checked><span><b>印刷屋・ベクターPDF</b><small>SVGパスをPDFパスのまま保持。画像素材が残っている場合は警告します。</small></span></label>
+      <label class="mode-card"><input type="radio" name="pdfMode" value="silk"><span><b>シルク1色</b><small>ベクターを黒1色で出力。画像素材は事前にベクター化してください。</small></span></label>
+      <label class="mode-card"><input type="radio" name="pdfMode" value="raster"><span><b>家庭用・画像PDF</b><small>見た目をそのまま高解像度画像としてPDF化します。</small></span></label>
+    </div>
+    <div id="printCheck" class="print-check info">診断中…</div>
+    <div class="dialog-actions">
+      <button id="cancelPdf" class="secondary">キャンセル</button>
+      <button id="confirmPdf">PDF作成</button>
+    </div>
+  </div>
+</dialog>
+
 <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg2pdf.js@2.2.4/dist/svg2pdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.js"></script>
 <script src="script.js"></script>
 </body>

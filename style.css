@@ -58,3 +58,16 @@ dialog::backdrop{background:rgba(0,0,0,.55)}
 .vector-settings label{display:flex;flex-direction:column;gap:6px}
 .vector-actions{grid-template-columns:1fr 1fr 1fr}
 @media(max-width:600px){.edit-tools{grid-template-columns:1fr 1fr}.vector-settings{grid-template-columns:1fr}.vector-actions{grid-template-columns:1fr 1fr}.vector-actions #applyVector{grid-column:1/-1}.vector-dialog-body{padding:16px}}
+
+
+.pdf-dialog-body{width:min(94vw,620px);max-width:620px}
+.pdf-modes{display:grid;gap:9px;margin-top:12px}
+.mode-card{display:flex;gap:10px;align-items:flex-start;margin:0;padding:12px;border:1px solid var(--line);border-radius:13px;color:#111;background:#fff}
+.mode-card input{margin-top:4px;transform:scale(1.2)}
+.mode-card span{display:flex;flex-direction:column;gap:4px}
+.mode-card b{font-size:14px}
+.mode-card small{font-size:11px;line-height:1.45;color:var(--muted)}
+.print-check{margin-top:12px;white-space:pre-line}
+.print-check.ok{border-color:#3a7f45;background:#f1faf2}
+.print-check.warn{border-color:#b7791f;background:#fff9ea}
+.print-check.bad{border-color:#a51d1d;background:#fff1f1}
