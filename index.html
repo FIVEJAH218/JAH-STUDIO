@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#111111">
-  <title>JAH STUDIO v1.3</title>
+  <title>JAH STUDIO v1.4</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -14,7 +14,7 @@
     <h1>JAH STUDIO</h1>
     <small>PRINT DESIGN STUDIO</small>
   </div>
-  <span>v1.3</span>
+  <span>v1.4</span>
 </header>
 
 <main>
@@ -59,6 +59,11 @@
       <button id="addText">＋文字</button>
       <button id="duplicate" class="secondary">複製</button>
       <button id="remove" class="danger">削除</button>
+    </div>
+    <div class="tools three">
+      <button id="cropBtn" class="secondary">✂ トリミング</button>
+      <button id="whiteBtn" class="secondary">白抜き</button>
+      <button id="blackBtn" class="secondary">黒ベタ</button>
     </div>
     <div class="tools two-buttons">
       <button id="undo" class="secondary">↶ 戻す</button>
@@ -142,6 +147,37 @@
     <div class="dialog-actions">
       <button id="cancelText" class="secondary">戻る</button>
       <button id="confirmText">追加</button>
+    </div>
+  </div>
+</dialog>
+
+
+<dialog id="cropDialog">
+  <div class="dialog-body crop-dialog-body">
+    <h3>トリミング</h3>
+    <canvas id="cropPreview" width="600" height="600"></canvas>
+    <div class="crop-grid">
+      <label>左 <span id="cropLeftV">0%</span><input id="cropLeft" type="range" min="0" max="45" value="0"></label>
+      <label>右 <span id="cropRightV">0%</span><input id="cropRight" type="range" min="0" max="45" value="0"></label>
+      <label>上 <span id="cropTopV">0%</span><input id="cropTop" type="range" min="0" max="45" value="0"></label>
+      <label>下 <span id="cropBottomV">0%</span><input id="cropBottom" type="range" min="0" max="45" value="0"></label>
+    </div>
+    <div class="dialog-actions">
+      <button id="cancelCrop" class="secondary">戻る</button>
+      <button id="applyCrop">適用</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="whiteDialog">
+  <div class="dialog-body">
+    <h3>白抜き</h3>
+    <p class="hint">白に近い部分を透明にします。</p>
+    <label>白抜きの強さ <span id="whiteValue">235</span></label>
+    <input id="whiteThreshold" type="range" min="180" max="254" value="235">
+    <div class="dialog-actions">
+      <button id="cancelWhite" class="secondary">戻る</button>
+      <button id="applyWhite">適用</button>
     </div>
   </div>
 </dialog>

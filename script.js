@@ -1,7 +1,7 @@
 (() => {
   const $ = id => document.getElementById(id);
   const { jsPDF } = window.jspdf;
-  const KEY = 'jahStudioProjectV13';
+  const KEY = 'jahStudioProjectV14';
   const templates = {a3p:[297,420],a3l:[420,297],a4p:[210,297],b4p:[257,364],b5p:[182,257],leftchest:[100,100],sleeve:[90,300],senjafuda:[45,135]};
   let pageW=297,pageH=420,seq=1,guideObjs=[],saveTimer=null;
   let history=[],historyIndex=-1,historyBusy=false;
@@ -51,6 +51,54 @@
   $('addImage').onclick=()=>$('imageInput').click();
   $('imageInput').onchange=e=>{[...e.target.files].forEach(file=>{const r=new FileReader();const svg=file.type==='image/svg+xml'||file.name.toLowerCase().endsWith('.svg');r.onload=ev=>svg?addSvg(ev.target.result,file.name):addRaster(ev.target.result,file.name);svg?r.readAsText(file):r.readAsDataURL(file);});e.target.value='';};
   $('addText').onclick=()=>$('textDialog').showModal();$('cancelText').onclick=()=>$('textDialog').close();
+
+  function isRasterImage(o){return o && o.type==='image' && o._element;}
+  function rasterizeObject(o, callback){
+    if(!o)return;
+    const bounds=o.getBoundingRect(true,true);
+    const cloneCanvas=new fabric.StaticCanvas(null,{width:Math.max(1,Math.ceil(bounds.width*4)),height:Math.max(1,Math.ceil(bounds.height*4)),backgroundColor:'transparent'});
+    o.clone(c=>{
+      c.set({left:-bounds.left*4,top:-bounds.top*4,scaleX:(c.scaleX||1)*4,scaleY:(c.scaleY||1)*4,angle:o.angle||0,originX:o.originX,originY:o.originY});
+      cloneCanvas.add(c);cloneCanvas.renderAll();
+      const url=cloneCanvas.toDataURL({format:'png',multiplier:1});
+      callback(url,bounds);
+      cloneCanvas.dispose();
+    });
+  }
+  function replaceWithRaster(old,url,bounds,name){
+    fabric.Image.fromURL(url,img=>{
+      tag(img,name||old._jahName||'素材');
+      img.set({left:bounds.left,top:bounds.top,originX:'left',originY:'top',scaleX:bounds.width/img.width,scaleY:bounds.height/img.height,angle:0,opacity:old.opacity??1});
+      canvas.remove(old);canvas.add(img).setActiveObject(img);afterChange();
+    });
+  }
+
+  let cropTarget=null,cropSource=null;
+  function drawCropPreview(){
+    if(!cropSource)return;const c=$('cropPreview'),ctx=c.getContext('2d');
+    const iw=cropSource.width,ih=cropSource.height,scale=Math.min(c.width/iw,c.height/ih),dw=iw*scale,dh=ih*scale,ox=(c.width-dw)/2,oy=(c.height-dh)/2;
+    ctx.clearRect(0,0,c.width,c.height);ctx.fillStyle='#ddd';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(cropSource,ox,oy,dw,dh);
+    const l=+$('cropLeft').value/100,r=+$('cropRight').value/100,t=+$('cropTop').value/100,b=+$('cropBottom').value/100;
+    const x=ox+dw*l,y=oy+dh*t,w=dw*(1-l-r),h=dh*(1-t-b);
+    ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(ox,oy,dw,Math.max(0,y-oy));ctx.fillRect(ox,y,Math.max(0,x-ox),h);ctx.fillRect(x+w,y,Math.max(0,ox+dw-(x+w)),h);ctx.fillRect(ox,y+h,dw,Math.max(0,oy+dh-(y+h)));
+    ctx.strokeStyle='#fff';ctx.lineWidth=4;ctx.strokeRect(x,y,w,h);
+  }
+  ['cropLeft','cropRight','cropTop','cropBottom'].forEach(id=>$(id).oninput=()=>{const label=id+'V';$(label).textContent=$(id).value+'%';drawCropPreview();});
+  $('cropBtn').onclick=()=>{const o=active();if(!o){status('先に素材を選択してください。');return;}if(!isRasterImage(o)){status('トリミングは画像素材に使えます。SVGは先に黒ベタ化すると画像になります。');return;}cropTarget=o;cropSource=o._element;['cropLeft','cropRight','cropTop','cropBottom'].forEach(id=>{$(id).value=0;$(id+'V').textContent='0%';});drawCropPreview();$('cropDialog').showModal();};
+  $('cancelCrop').onclick=()=>$('cropDialog').close();
+  $('applyCrop').onclick=()=>{if(!cropTarget||!cropSource)return;const l=+$('cropLeft').value/100,r=+$('cropRight').value/100,t=+$('cropTop').value/100,b=+$('cropBottom').value/100;const sx=Math.round(cropSource.width*l),sy=Math.round(cropSource.height*t),sw=Math.max(1,Math.round(cropSource.width*(1-l-r))),sh=Math.max(1,Math.round(cropSource.height*(1-t-b)));const temp=document.createElement('canvas');temp.width=sw;temp.height=sh;temp.getContext('2d').drawImage(cropSource,sx,sy,sw,sh,0,0,sw,sh);const oldW=cropTarget.getScaledWidth(),oldH=cropTarget.getScaledHeight(),newW=oldW*(sw/cropSource.width),newH=oldH*(sh/cropSource.height);const left=(cropTarget.left||0)+oldW*l,top=(cropTarget.top||0)+oldH*t;const data=temp.toDataURL('image/png');fabric.Image.fromURL(data,img=>{tag(img,cropTarget._jahName||'トリミング画像');img.set({left,top,originX:'left',originY:'top',scaleX:newW/img.width,scaleY:newH/img.height,opacity:cropTarget.opacity??1});canvas.remove(cropTarget);canvas.add(img).setActiveObject(img);$('cropDialog').close();afterChange('トリミングを適用しました。');});};
+
+  $('whiteBtn').onclick=()=>{const o=active();if(!o){status('先に素材を選択してください。');return;}if(!isRasterImage(o)){status('白抜きは画像素材に使えます。');return;}$('whiteDialog').showModal();};
+  $('whiteThreshold').oninput=()=>$('whiteValue').textContent=$('whiteThreshold').value;
+  $('cancelWhite').onclick=()=>$('whiteDialog').close();
+  $('applyWhite').onclick=()=>{const o=active();if(!isRasterImage(o))return;const img=o._element,c=document.createElement('canvas');c.width=img.naturalWidth||img.width;c.height=img.naturalHeight||img.height;const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0,c.width,c.height);const d=ctx.getImageData(0,0,c.width,c.height),th=+$('whiteThreshold').value;for(let i=0;i<d.data.length;i+=4){const r=d.data[i],g=d.data[i+1],b=d.data[i+2];if(r>=th&&g>=th&&b>=th){const closeness=(Math.min(r,g,b)-th)/(255-th);d.data[i+3]=Math.round(255*(1-closeness));}}ctx.putImageData(d,0,0);const url=c.toDataURL('image/png'),bounds=o.getBoundingRect(true,true);$('whiteDialog').close();replaceWithRaster(o,url,bounds,(o._jahName||'素材')+' 白抜き');status('白抜きを適用しました。');};
+
+  function paintBlack(obj){
+    if(obj.type==='group'&&obj.getObjects)obj.getObjects().forEach(paintBlack);
+    if('fill' in obj&&obj.fill&&obj.fill!=='transparent')obj.set('fill','#000');
+    if('stroke' in obj&&obj.stroke&&obj.stroke!=='transparent')obj.set('stroke','#000');
+  }
+  $('blackBtn').onclick=()=>{const o=active();if(!o){status('先に素材を選択してください。');return;}if(isRasterImage(o)){const img=o._element,c=document.createElement('canvas');c.width=img.naturalWidth||img.width;c.height=img.naturalHeight||img.height;const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0,c.width,c.height);const d=ctx.getImageData(0,0,c.width,c.height);for(let i=0;i<d.data.length;i+=4){if(d.data[i+3]>0){d.data[i]=0;d.data[i+1]=0;d.data[i+2]=0;}}ctx.putImageData(d,0,0);replaceWithRaster(o,c.toDataURL('image/png'),o.getBoundingRect(true,true),(o._jahName||'素材')+' 黒ベタ');}else{paintBlack(o);canvas.requestRenderAll();afterChange('黒ベタ化しました。');}};
   $('confirmText').onclick=()=>{const t=$('textValue').value||'TEXT';const o=new fabric.Textbox(t,{left:pageW/2,top:pageH/2,originX:'center',originY:'center',width:pageW*.7,fontSize:18,fontFamily:$('fontFamily').value,fill:'#111',textAlign:'center'});tag(o,'文字: '+t);canvas.add(o).setActiveObject(o);$('textDialog').close();afterChange();};
   $('remove').onclick=()=>{const o=active();if(o){canvas.remove(o);afterChange();}};
   $('duplicate').onclick=()=>{const o=active();if(!o)return;o.clone(c=>{tag(c,(o._jahName||'素材')+' コピー');c.set({left:o.left+8,top:o.top+8});canvas.add(c).setActiveObject(c);afterChange();});};
@@ -66,7 +114,7 @@
   function refreshLayers(){const host=$('layers');host.innerHTML='';userObjects().slice().reverse().forEach(o=>{const row=document.createElement('div');row.className='layer'+(active()===o?' active':'');const name=document.createElement('button');name.className='name secondary';name.textContent=o._jahName||o.type;name.onclick=()=>{canvas.setActiveObject(o);canvas.requestRenderAll();refreshLayers();updateInfo();};const up=document.createElement('button');up.className='secondary';up.textContent='↑';up.onclick=()=>{canvas.bringForward(o);guideObjs.forEach(g=>canvas.bringToFront(g));afterChange();};const down=document.createElement('button');down.className='secondary';down.textContent='↓';down.onclick=()=>{canvas.sendBackwards(o);guideObjs.forEach(g=>canvas.bringToFront(g));afterChange();};const lock=document.createElement('button');lock.className='secondary';lock.textContent=o.selectable?'🔓':'🔒';lock.onclick=()=>{const v=o.selectable;o.set({selectable:!v,evented:!v});canvas.discardActiveObject();canvas.requestRenderAll();afterChange();};const del=document.createElement('button');del.className='danger';del.textContent='×';del.onclick=()=>{canvas.remove(o);afterChange();};row.append(name,up,down,lock,del);host.appendChild(row);});}
   function snapObject(o){if(!$('snap').checked)return;if(Math.abs(o.getCenterPoint().x-pageW/2)<4)o.set({left:pageW/2,originX:'center'});if(Math.abs(o.getCenterPoint().y-pageH/2)<4)o.set({top:pageH/2,originY:'center'});}
 
-  function snapshot(){return JSON.stringify({version:'1.3',pageW,pageH,template:$('template').value,guides:$('guides').checked,grid:$('grid').checked,snap:$('snap').checked,json:canvas.toJSON(['_jahId','_jahName','excludeFromExport'])});}
+  function snapshot(){return JSON.stringify({version:'1.4',pageW,pageH,template:$('template').value,guides:$('guides').checked,grid:$('grid').checked,snap:$('snap').checked,json:canvas.toJSON(['_jahId','_jahName','excludeFromExport'])});}
   function recordHistory(){if(historyBusy)return;const s=snapshot();if(history[historyIndex]===s)return;history=history.slice(0,historyIndex+1);history.push(s);if(history.length>30)history.shift();historyIndex=history.length-1;updateHistoryButtons();}
   function updateHistoryButtons(){$('undo').disabled=historyIndex<=0;$('redo').disabled=historyIndex>=history.length-1;}
   function loadState(state){historyBusy=true;const d=JSON.parse(state);pageW=d.pageW;pageH=d.pageH;$('template').value=d.template||'custom';$('docW').value=pageW;$('docH').value=pageH;$('guides').checked=d.guides!==false;$('grid').checked=!!d.grid;$('snap').checked=d.snap!==false;canvas.loadFromJSON(d.json,()=>{resizeCanvas();refreshLayers();updateInfo();historyBusy=false;scheduleSave();updateHistoryButtons();});}
