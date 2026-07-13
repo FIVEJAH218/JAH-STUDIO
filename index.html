@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#111111">
-  <title>JAH STUDIO v1.4</title>
+  <title>JAH STUDIO v1.5β</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -14,7 +14,7 @@
     <h1>JAH STUDIO</h1>
     <small>PRINT DESIGN STUDIO</small>
   </div>
-  <span>v1.4</span>
+  <span>v1.5β</span>
 </header>
 
 <main>
@@ -60,8 +60,9 @@
       <button id="duplicate" class="secondary">複製</button>
       <button id="remove" class="danger">削除</button>
     </div>
-    <div class="tools three">
+    <div class="tools edit-tools">
       <button id="cropBtn" class="secondary">✂ トリミング</button>
+      <button id="vectorBtn" class="secondary vector-accent">◆ ベクター化</button>
       <button id="whiteBtn" class="secondary">白抜き</button>
       <button id="blackBtn" class="secondary">黒ベタ</button>
     </div>
@@ -182,8 +183,35 @@
   </div>
 </dialog>
 
+
+<dialog id="vectorDialog">
+  <div class="dialog-body vector-dialog-body">
+    <h3>ロゴ向けベクター化</h3>
+    <p class="hint">黒い部分を本物のSVGパスへ変換します。白い部分は透明になります。</p>
+    <canvas id="vectorPreview" width="700" height="520"></canvas>
+    <div class="vector-settings">
+      <label>しきい値 <span id="vectorThresholdV">160</span>
+        <input id="vectorThreshold" type="range" min="0" max="255" value="160">
+      </label>
+      <label>ノイズ除去 <span id="vectorNoiseV">4</span>
+        <input id="vectorNoise" type="range" min="0" max="30" value="4">
+      </label>
+      <label>輪郭の滑らかさ <span id="vectorSmoothV">4</span>
+        <input id="vectorSmooth" type="range" min="0" max="10" value="4">
+      </label>
+    </div>
+    <div id="vectorStatus" class="info">設定を動かすとプレビューが更新されます。</div>
+    <div class="dialog-actions vector-actions">
+      <button id="cancelVector" class="secondary">キャンセル</button>
+      <button id="saveVector" class="secondary">SVG保存</button>
+      <button id="applyVector">適用</button>
+    </div>
+  </div>
+</dialog>
+
 <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

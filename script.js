@@ -88,6 +88,115 @@
   $('cancelCrop').onclick=()=>$('cropDialog').close();
   $('applyCrop').onclick=()=>{if(!cropTarget||!cropSource)return;const l=+$('cropLeft').value/100,r=+$('cropRight').value/100,t=+$('cropTop').value/100,b=+$('cropBottom').value/100;const sx=Math.round(cropSource.width*l),sy=Math.round(cropSource.height*t),sw=Math.max(1,Math.round(cropSource.width*(1-l-r))),sh=Math.max(1,Math.round(cropSource.height*(1-t-b)));const temp=document.createElement('canvas');temp.width=sw;temp.height=sh;temp.getContext('2d').drawImage(cropSource,sx,sy,sw,sh,0,0,sw,sh);const oldW=cropTarget.getScaledWidth(),oldH=cropTarget.getScaledHeight(),newW=oldW*(sw/cropSource.width),newH=oldH*(sh/cropSource.height);const left=(cropTarget.left||0)+oldW*l,top=(cropTarget.top||0)+oldH*t;const data=temp.toDataURL('image/png');fabric.Image.fromURL(data,img=>{tag(img,cropTarget._jahName||'トリミング画像');img.set({left,top,originX:'left',originY:'top',scaleX:newW/img.width,scaleY:newH/img.height,opacity:cropTarget.opacity??1});canvas.remove(cropTarget);canvas.add(img).setActiveObject(img);$('cropDialog').close();afterChange('トリミングを適用しました。');});};
 
+
+  let vectorTarget=null,vectorTimer=null,lastVectorSvg='';
+
+  function sourceCanvasFromImageObject(o,maxSide=1200){
+    const img=o._element;
+    const sw=img.naturalWidth||img.width,sh=img.naturalHeight||img.height;
+    const scale=Math.min(1,maxSide/Math.max(sw,sh));
+    const c=document.createElement('canvas');
+    c.width=Math.max(1,Math.round(sw*scale));c.height=Math.max(1,Math.round(sh*scale));
+    const ctx=c.getContext('2d',{willReadFrequently:true});
+    ctx.drawImage(img,0,0,c.width,c.height);
+    return c;
+  }
+
+  function removeSmallBlackComponents(imageData,minSize){
+    if(minSize<=0)return imageData;
+    const {width:w,height:h,data}=imageData,seen=new Uint8Array(w*h),stack=[],component=[];
+    const isBlack=i=>data[i*4+3]>0&&data[i*4]<128;
+    for(let start=0;start<w*h;start++){
+      if(seen[start]||!isBlack(start))continue;
+      stack.length=0;component.length=0;stack.push(start);seen[start]=1;
+      while(stack.length){
+        const i=stack.pop();component.push(i);const x=i%w,y=(i/w)|0;
+        if(x>0){const n=i-1;if(!seen[n]&&isBlack(n)){seen[n]=1;stack.push(n);}}
+        if(x<w-1){const n=i+1;if(!seen[n]&&isBlack(n)){seen[n]=1;stack.push(n);}}
+        if(y>0){const n=i-w;if(!seen[n]&&isBlack(n)){seen[n]=1;stack.push(n);}}
+        if(y<h-1){const n=i+w;if(!seen[n]&&isBlack(n)){seen[n]=1;stack.push(n);}}
+      }
+      if(component.length<minSize){for(const i of component)data[i*4+3]=0;}
+    }
+    return imageData;
+  }
+
+  function makeBinaryImageData(source,threshold,noise){
+    const ctx=source.getContext('2d',{willReadFrequently:true});
+    const d=ctx.getImageData(0,0,source.width,source.height);
+    for(let i=0;i<d.data.length;i+=4){
+      const a=d.data[i+3],lum=.2126*d.data[i]+.7152*d.data[i+1]+.0722*d.data[i+2];
+      if(a<16||lum>=threshold){d.data[i]=255;d.data[i+1]=255;d.data[i+2]=255;d.data[i+3]=0;}
+      else{d.data[i]=0;d.data[i+1]=0;d.data[i+2]=0;d.data[i+3]=255;}
+    }
+    return removeSmallBlackComponents(d,noise);
+  }
+
+  function drawVectorPreview(){
+    if(!vectorTarget)return;
+    const preview=$('vectorPreview'),pctx=preview.getContext('2d');
+    try{
+      const source=sourceCanvasFromImageObject(vectorTarget,900);
+      const d=makeBinaryImageData(source,+$('vectorThreshold').value,+$('vectorNoise').value);
+      const tmp=document.createElement('canvas');tmp.width=d.width;tmp.height=d.height;tmp.getContext('2d').putImageData(d,0,0);
+      pctx.clearRect(0,0,preview.width,preview.height);
+      const sc=Math.min(preview.width/tmp.width,preview.height/tmp.height),dw=tmp.width*sc,dh=tmp.height*sc;
+      pctx.drawImage(tmp,(preview.width-dw)/2,(preview.height-dh)/2,dw,dh);
+      $('vectorStatus').textContent=`プレビュー ${d.width}×${d.height}px｜黒い部分がSVGになります。`;
+    }catch(e){$('vectorStatus').textContent='プレビューの作成に失敗しました。';}
+  }
+
+  function scheduleVectorPreview(){clearTimeout(vectorTimer);vectorTimer=setTimeout(drawVectorPreview,100);}
+  ['vectorThreshold','vectorNoise','vectorSmooth'].forEach(id=>$(id).oninput=()=>{$(id+'V').textContent=$(id).value;scheduleVectorPreview();});
+
+  function buildVectorSvg(){
+    if(!vectorTarget)throw new Error('画像が選択されていません。');
+    if(!window.ImageTracer)throw new Error('ベクター化ライブラリを読み込めません。通信環境を確認してください。');
+    const source=sourceCanvasFromImageObject(vectorTarget,1400);
+    const imageData=makeBinaryImageData(source,+$('vectorThreshold').value,+$('vectorNoise').value);
+    const smooth=+$('vectorSmooth').value;
+    let svg=ImageTracer.imagedataToSVG(imageData,{
+      ltres:1+smooth*.22,qtres:1+smooth*.22,pathomit:Math.max(0,+$('vectorNoise').value),
+      rightangleenhance:true,colorsampling:0,numberofcolors:2,mincolorratio:0,colorquantcycles:1,
+      strokewidth:0,linefilter:false,scale:1,roundcoords:2,viewbox:true,desc:false
+    });
+    svg=svg.replace(/<path[^>]*fill="rgb\(255,255,255\)"[^>]*\/?>/g,'')
+           .replace(/<path[^>]*fill="rgb\(255, 255, 255\)"[^>]*\/?>/g,'')
+           .replace(/fill="rgb\(0,0,0\)"/g,'fill="#000000"')
+           .replace(/fill="rgb\(0, 0, 0\)"/g,'fill="#000000"');
+    if(!/<path\b/i.test(svg))throw new Error('輪郭を検出できませんでした。しきい値を調整してください。');
+    return svg;
+  }
+
+  $('vectorBtn').onclick=()=>{
+    const o=active();
+    if(!o){status('先に画像を選択してください。');return;}
+    if(!isRasterImage(o)){status('ベクター化はPNG・JPEG画像に使えます。');return;}
+    vectorTarget=o;lastVectorSvg='';$('vectorDialog').showModal();drawVectorPreview();
+  };
+  $('cancelVector').onclick=()=>{$('vectorDialog').close();vectorTarget=null;lastVectorSvg='';};
+  $('saveVector').onclick=()=>{
+    try{
+      $('vectorStatus').textContent='SVGを作成中です…';lastVectorSvg=buildVectorSvg();
+      const url=URL.createObjectURL(new Blob([lastVectorSvg],{type:'image/svg+xml'}));
+      download(url,'JAH_STUDIO_vector.svg');setTimeout(()=>URL.revokeObjectURL(url),1500);
+      $('vectorStatus').textContent='本物のSVGパスとして保存しました。';status('ベクターSVGを保存しました。');
+    }catch(e){$('vectorStatus').textContent=e.message||'ベクター化に失敗しました。';}
+  };
+  $('applyVector').onclick=()=>{
+    try{
+      $('vectorStatus').textContent='ベクター化して配置中です…';
+      const old=vectorTarget,svg=buildVectorSvg(),center=old.getCenterPoint(),w=old.getScaledWidth(),h=old.getScaledHeight(),angle=old.angle||0,opacity=old.opacity??1,name=(old._jahName||'素材')+' ベクター';
+      fabric.loadSVGFromString(svg,(objects,options)=>{
+        if(!objects||!objects.length){$('vectorStatus').textContent='SVGパスを作成できませんでした。';return;}
+        const obj=fabric.util.groupSVGElements(objects,options);tag(obj,name);
+        obj.set({left:center.x,top:center.y,originX:'center',originY:'center',angle,opacity,scaleX:w/obj.width,scaleY:h/obj.height});
+        canvas.remove(old);canvas.add(obj).setActiveObject(obj);guideObjs.forEach(g=>canvas.bringToFront(g));
+        $('vectorDialog').close();vectorTarget=null;lastVectorSvg='';afterChange('ベクター化を適用しました。SVG書き出しでもpathとして保存されます。');
+      });
+    }catch(e){$('vectorStatus').textContent=e.message||'ベクター化に失敗しました。';}
+  };
+
   $('whiteBtn').onclick=()=>{const o=active();if(!o){status('先に素材を選択してください。');return;}if(!isRasterImage(o)){status('白抜きは画像素材に使えます。');return;}$('whiteDialog').showModal();};
   $('whiteThreshold').oninput=()=>$('whiteValue').textContent=$('whiteThreshold').value;
   $('cancelWhite').onclick=()=>$('whiteDialog').close();
@@ -114,7 +223,7 @@
   function refreshLayers(){const host=$('layers');host.innerHTML='';userObjects().slice().reverse().forEach(o=>{const row=document.createElement('div');row.className='layer'+(active()===o?' active':'');const name=document.createElement('button');name.className='name secondary';name.textContent=o._jahName||o.type;name.onclick=()=>{canvas.setActiveObject(o);canvas.requestRenderAll();refreshLayers();updateInfo();};const up=document.createElement('button');up.className='secondary';up.textContent='↑';up.onclick=()=>{canvas.bringForward(o);guideObjs.forEach(g=>canvas.bringToFront(g));afterChange();};const down=document.createElement('button');down.className='secondary';down.textContent='↓';down.onclick=()=>{canvas.sendBackwards(o);guideObjs.forEach(g=>canvas.bringToFront(g));afterChange();};const lock=document.createElement('button');lock.className='secondary';lock.textContent=o.selectable?'🔓':'🔒';lock.onclick=()=>{const v=o.selectable;o.set({selectable:!v,evented:!v});canvas.discardActiveObject();canvas.requestRenderAll();afterChange();};const del=document.createElement('button');del.className='danger';del.textContent='×';del.onclick=()=>{canvas.remove(o);afterChange();};row.append(name,up,down,lock,del);host.appendChild(row);});}
   function snapObject(o){if(!$('snap').checked)return;if(Math.abs(o.getCenterPoint().x-pageW/2)<4)o.set({left:pageW/2,originX:'center'});if(Math.abs(o.getCenterPoint().y-pageH/2)<4)o.set({top:pageH/2,originY:'center'});}
 
-  function snapshot(){return JSON.stringify({version:'1.4',pageW,pageH,template:$('template').value,guides:$('guides').checked,grid:$('grid').checked,snap:$('snap').checked,json:canvas.toJSON(['_jahId','_jahName','excludeFromExport'])});}
+  function snapshot(){return JSON.stringify({version:'1.5β',pageW,pageH,template:$('template').value,guides:$('guides').checked,grid:$('grid').checked,snap:$('snap').checked,json:canvas.toJSON(['_jahId','_jahName','excludeFromExport'])});}
   function recordHistory(){if(historyBusy)return;const s=snapshot();if(history[historyIndex]===s)return;history=history.slice(0,historyIndex+1);history.push(s);if(history.length>30)history.shift();historyIndex=history.length-1;updateHistoryButtons();}
   function updateHistoryButtons(){$('undo').disabled=historyIndex<=0;$('redo').disabled=historyIndex>=history.length-1;}
   function loadState(state){historyBusy=true;const d=JSON.parse(state);pageW=d.pageW;pageH=d.pageH;$('template').value=d.template||'custom';$('docW').value=pageW;$('docH').value=pageH;$('guides').checked=d.guides!==false;$('grid').checked=!!d.grid;$('snap').checked=d.snap!==false;canvas.loadFromJSON(d.json,()=>{resizeCanvas();refreshLayers();updateInfo();historyBusy=false;scheduleSave();updateHistoryButtons();});}

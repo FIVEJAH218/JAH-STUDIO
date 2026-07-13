@@ -48,3 +48,13 @@ dialog::backdrop{background:rgba(0,0,0,.55)}
 .crop-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
 .crop-grid label{display:flex;flex-direction:column;gap:6px}
 @media(max-width:520px){.crop-grid{grid-template-columns:1fr}.crop-dialog-body{padding:18px}}
+
+
+.edit-tools{grid-template-columns:repeat(4,1fr);margin-top:8px}
+.vector-accent{border-width:2px!important}
+.vector-dialog-body{width:min(94vw,760px);max-width:760px}
+#vectorPreview{display:block;width:100%;height:auto;max-height:48vh;background:repeating-conic-gradient(#eee 0 25%,#fff 0 50%) 50%/18px 18px;border:1px solid #bbb;border-radius:14px;margin-top:12px}
+.vector-settings{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:10px}
+.vector-settings label{display:flex;flex-direction:column;gap:6px}
+.vector-actions{grid-template-columns:1fr 1fr 1fr}
+@media(max-width:600px){.edit-tools{grid-template-columns:1fr 1fr}.vector-settings{grid-template-columns:1fr}.vector-actions{grid-template-columns:1fr 1fr}.vector-actions #applyVector{grid-column:1/-1}.vector-dialog-body{padding:16px}}
